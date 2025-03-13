@@ -49,6 +49,7 @@ def align_images(
     alignment_method: AlignmentMethod = 'ORB',
     feature_size: Optional[int] = None,
     threshold_factor: float = 0.67,
+    reference_index: Optional[int] = None,
 ) -> Iterable[AffineMatrix]:
     """perform alignment of images.
 
@@ -88,7 +89,6 @@ def align_images(
     if alignment_method != 'ORB':
         raise ValueError("only 'ORB' is accepted right now as the alignment method")
 
-    coords = Coordinates.from_image(images[0])
     _perform_alignment = _featurebased.get_alignment_method(
         method=alignment_method,
         feature_size=feature_size,
@@ -96,13 +96,17 @@ def align_images(
         threshold_factor=threshold_factor,
     )
 
-    points = [_compute.center_of_mass(
-        img,
-        coords=coords,
-        as_int=True
-    ) for img in images]
+    if reference_index is None:
+        coords = Coordinates.from_image(images[0])
+        points = [_compute.center_of_mass(
+            img,
+            coords=coords,
+            as_int=True
+        ) for img in images]
+        refidx = _get_reference_index(points, use_percentile=use_percentile)
+    else:
+        refidx = int(reference_index)
 
-    refidx = _get_reference_index(points, use_percentile=use_percentile)
     ref = images[refidx]
 
     def _estimate(ref, query):
@@ -113,7 +117,7 @@ def align_images(
         return _affine.estimate(xy_q, xy_r)
 
     transs = []
-    for i in range(len(points)):
+    for i in range(len(images)):
         if i == refidx:
             trans = _affine.identity()
         else:
